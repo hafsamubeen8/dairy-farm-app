@@ -47,13 +47,15 @@ jobs:
 
       - name: Download Android PySide6 wheel
         run: |
-          wget -O pyside6_android.whl \
-            https://download.qt.io/official_releases/QtForPython/pyside6/pyside6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl
+          wget https://download.qt.io/official_releases/QtForPython/pyside6/pyside6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl
 
       - name: Download Android Shiboken6 wheel
         run: |
-          wget -O shiboken6_android.whl \
-            https://download.qt.io/official_releases/QtForPython/shiboken6/shiboken6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl
+          wget https://download.qt.io/official_releases/QtForPython/shiboken6/shiboken6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl
+
+      - name: Find Android wheels
+        run: |
+          ls -lh *.whl
 
       - name: Check deployment tool
         run: |
@@ -61,10 +63,20 @@ jobs:
 
       - name: Build Android APK
         run: |
+          PYSIDE_WHEEL=$(find "$GITHUB_WORKSPACE" -maxdepth 1 -name "pyside6-*-android_aarch64.whl" | head -n 1)
+          SHIBOKEN_WHEEL=$(find "$GITHUB_WORKSPACE" -maxdepth 1 -name "shiboken6-*-android_aarch64.whl" | head -n 1)
+
+          echo "PySide wheel: $PYSIDE_WHEEL"
+          echo "Shiboken wheel: $SHIBOKEN_WHEEL"
+
+          test -n "$PYSIDE_WHEEL"
+          test -n "$SHIBOKEN_WHEEL"
+
           pyside6-android-deploy \
             --name "Dairy Farm" \
-            --wheel-pyside "$GITHUB_WORKSPACE/pyside6_android.whl" \
-            --wheel-shiboken "$GITHUB_WORKSPACE/shiboken6_android.whl" \
+            --input main.py \
+            --wheel-pyside "$PYSIDE_WHEEL" \
+            --wheel-shiboken "$SHIBOKEN_WHEEL" \
             --ndk-path "$ANDROID_NDK_ROOT" \
             --sdk-path "$ANDROID_SDK_ROOT" \
             --force
