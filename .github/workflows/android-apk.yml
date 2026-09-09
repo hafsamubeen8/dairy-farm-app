@@ -23,17 +23,32 @@ jobs:
           test -f main.py
           test -f dairy_farm.db
 
-      - name: Install PySide6 and deployment requirements
+      - name: Install Android SDK and NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android packages
+        run: |
+          sdkmanager "platform-tools"
+          sdkmanager "platforms;android-35"
+          sdkmanager "build-tools;35.0.0"
+          sdkmanager "ndk;28.0.13004108"
+
+      - name: Install Python packages
         run: |
           python -m pip install --upgrade pip
-          pip install PySide6==6.11.1
+          pip install PySide6==6.11.2
           pip install pkginfo packaging jinja2 tqdm buildozer setuptools
+          pip install -r /opt/hostedtoolcache/Python/3.11.*/x64/lib/python3.11/site-packages/PySide6/scripts/requirements-android.txt
 
-      - name: Install Android deployment requirements
+      - name: Download official Android wheels
         run: |
-          pip install -r /opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/PySide6/scripts/requirements-android.txt
+          wget -O pyside6_android.whl \
+            https://download.qt.io/official_releases/QtForPython/pyside6/pyside6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl
 
-      - name: Check PySide6 deployment
+          wget -O shiboken6_android.whl \
+            https://download.qt.io/official_releases/QtForPython/pyside6/shiboken6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl
+
+      - name: Check deployment tool
         run: |
           pyside6-android-deploy --help
 
@@ -41,7 +56,11 @@ jobs:
         run: |
           pyside6-android-deploy \
             --name "Dairy Farm" \
-            --input main.py
+            --wheel-pyside "$GITHUB_WORKSPACE/pyside6_android.whl" \
+            --wheel-shiboken "$GITHUB_WORKSPACE/shiboken6_android.whl" \
+            --ndk-path "$ANDROID_NDK_ROOT" \
+            --sdk-path "$ANDROID_SDK_ROOT" \
+            --force
 
       - name: Find APK
         run: |
