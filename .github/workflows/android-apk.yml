@@ -13,7 +13,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -34,52 +34,54 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
 
-      - name: Fix Android SDK tools
+      - name: Install Android SDK and NDK
         shell: bash
         run: |
-          echo "Android SDK: $ANDROID_SDK_ROOT"
-
-          MODERN_SDKMANAGER=$(find "$ANDROID_SDK_ROOT/cmdline-tools" \
+          SDKMANAGER=$(find "$ANDROID_SDK_ROOT/cmdline-tools" \
             -type f \
             -name sdkmanager \
             2>/dev/null | head -n 1)
 
-          if [ -z "$MODERN_SDKMANAGER" ]; then
-            echo "ERROR: Modern sdkmanager not found."
+          if [ -z "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager not found"
             exit 1
           fi
 
-          echo "Modern sdkmanager:"
-          echo "$MODERN_SDKMANAGER"
+          echo "Using sdkmanager:"
+          echo "$SDKMANAGER"
 
-          MODERN_SDK_BIN=$(dirname "$MODERN_SDKMANAGER")
-
-          echo "$MODERN_SDK_BIN" >> "$GITHUB_PATH"
-          echo "$ANDROID_SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
-
-          mkdir -p "$ANDROID_SDK_ROOT/tools/bin"
-
-          cat > "$ANDROID_SDK_ROOT/tools/bin/sdkmanager" <<EOF
-          #!/bin/bash
-          exec "$MODERN_SDKMANAGER" "\$@"
-          EOF
-
-          chmod +x "$ANDROID_SDK_ROOT/tools/bin/sdkmanager"
-
-          "$ANDROID_SDK_ROOT/tools/bin/sdkmanager" --version
-
-      - name: Install Android SDK packages
-        shell: bash
-        run: |
-          "$ANDROID_SDK_ROOT/tools/bin/sdkmanager" \
+          "$SDKMANAGER" \
             "platform-tools" \
             "platforms;android-35" \
             "build-tools;35.0.0" \
             "ndk;28.0.13004108"
 
-          yes | "$ANDROID_SDK_ROOT/tools/bin/sdkmanager" --licenses || true
+          yes | "$SDKMANAGER" --licenses || true
 
-          echo "Android SDK setup complete."
+          NDK_PATH="$ANDROID_SDK_ROOT/ndk/28.0.13004108"
+
+          if [ ! -d "$NDK_PATH" ]; then
+            echo "ERROR: NDK 28 was not installed"
+            exit 1
+          fi
+
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROIDSDK=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+
+          echo "ANDROID_NDK_ROOT=$NDK_PATH" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$NDK_PATH" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK=$NDK_PATH" >> "$GITHUB_ENV"
+          echo "ANDROIDNDK=$NDK_PATH" >> "$GITHUB_ENV"
+
+          echo "NDK_PATH=$NDK_PATH" >> "$GITHUB_ENV"
+
+          echo "Android SDK:"
+          echo "$ANDROID_SDK_ROOT"
+
+          echo "Android NDK:"
+          echo "$NDK_PATH"
+
+          "$NDK_PATH/ndk-build" --version || true
 
       - name: Install Python packages
         run: |
@@ -118,6 +120,24 @@ jobs:
         run: |
           pyside6-android-deploy --help
 
+      - name: Clean old Android build
+        run: |
+          rm -rf .buildozer
+          rm -rf deployment
+          echo "Old Android build files removed."
+
+      - name: Verify selected NDK
+        shell: bash
+        run: |
+          echo "ANDROID_NDK_ROOT=$ANDROID_NDK_ROOT"
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
+          echo "ANDROID_NDK=$ANDROID_NDK"
+          echo "ANDROIDNDK=$ANDROIDNDK"
+
+          test -d "$ANDROID_NDK_ROOT"
+
+          "$ANDROID_NDK_ROOT/ndk-build" --version || true
+
       - name: Build Android APK
         shell: bash
         run: |
@@ -125,6 +145,10 @@ jobs:
           PYSIDE_WHEEL="$GITHUB_WORKSPACE/pyside6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl"
 
           SHIBOKEN_WHEEL="$GITHUB_WORKSPACE/shiboken6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl"
+
+          echo "================================="
+          echo "Starting Dairy Farm APK Build"
+          echo "================================="
 
           echo "PySide6 wheel:"
           echo "$PYSIDE_WHEEL"
@@ -144,7 +168,9 @@ jobs:
           echo "Java:"
           java -version
 
-          echo "Starting Android build..."
+          echo "================================="
+          echo "Running pyside6-android-deploy"
+          echo "================================="
 
           pyside6-android-deploy \
             --name "Dairy Farm" \
