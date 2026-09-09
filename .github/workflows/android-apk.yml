@@ -9,24 +9,35 @@ jobs:
 
     steps:
 
-      # 1. Checkout project
+      # ==========================================
+      # 1. Checkout
+      # ==========================================
       - name: Checkout project
         uses: actions/checkout@v4
 
+
+      # ==========================================
       # 2. Java 17
+      # ==========================================
       - name: Set up Java 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
+
+      # ==========================================
       # 3. Python 3.11
+      # ==========================================
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+
+      # ==========================================
       # 4. Linux dependencies
+      # ==========================================
       - name: Install Linux dependencies
         shell: bash
         run: |
@@ -47,17 +58,20 @@ jobs:
             libffi-dev \
             libssl-dev
 
-          echo "Linux dependencies installed"
+          echo "Linux dependencies installed."
 
-      # 5. Check project
+
+      # ==========================================
+      # 5. Check project files
+      # ==========================================
       - name: Check project
         shell: bash
         run: |
           set -euxo pipefail
 
-          echo "=============================="
+          echo "=========================================="
           echo "PROJECT FILES"
-          echo "=============================="
+          echo "=========================================="
 
           find . -maxdepth 3 -type f | sort
 
@@ -73,7 +87,10 @@ jobs:
           echo "dairy_farm.db FOUND"
           echo "pyproject.toml FOUND"
 
+
+      # ==========================================
       # 6. Install PySide6
+      # ==========================================
       - name: Install PySide6
         shell: bash
         run: |
@@ -89,7 +106,10 @@ jobs:
 
           python -c "import PySide6; print('PySide6:', PySide6.__version__)"
 
+
+      # ==========================================
       # 7. Install Android deployment requirements
+      # ==========================================
       - name: Install Android deployment requirements
         shell: bash
         run: |
@@ -108,7 +128,7 @@ jobs:
           )
           ')
 
-          echo "Android requirements:"
+          echo "Requirements file:"
           echo "$REQUIREMENTS_FILE"
 
           test -f "$REQUIREMENTS_FILE"
@@ -117,33 +137,162 @@ jobs:
             --upgrade \
             -r "$REQUIREMENTS_FILE"
 
-          python -m pip install --upgrade pkginfo
+          python -m pip install \
+            --upgrade \
+            pkginfo
 
-          echo "Android deployment requirements installed"
+          echo "Android deployment requirements installed."
 
-      # 8. Verify deployment packages
-      - name: Verify deployment packages
+
+      # ==========================================
+      # 8. Android SDK
+      # ==========================================
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+
+      # ==========================================
+      # 9. Accept Android licenses
+      # ==========================================
+      - name: Accept Android SDK licenses
         shell: bash
         run: |
           set -euxo pipefail
 
-          python -c "import pkginfo; print('pkginfo OK')"
-          python -c "import packaging; print('packaging OK')"
-          python -c "import jinja2; print('jinja2 OK')"
-          python -c "import PySide6; print('PySide6 OK')"
+          yes | sdkmanager --licenses || true
+
+          echo "Android SDK licenses accepted."
+
+
+      # ==========================================
+      # 10. Install Android SDK packages
+      # ==========================================
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
 
           echo ""
-          echo "pyside6-android-deploy:"
-          which pyside6-android-deploy
+          echo "Android SDK packages installed."
 
           echo ""
-          pyside6-android-deploy --help
+          echo "Installed Build Tools:"
+          ls -lah "$ANDROID_HOME/build-tools"
 
-      # 9. Android SDK
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v4
+          echo ""
+          echo "AIDL files:"
+          find "$ANDROID_HOME/build-tools" \
+            -type f \
+            -name "aidl" \
+            -print
 
-      # 10. Download PySide6 Android wheel
+
+      # ==========================================
+      # 11. Configure Buildozer Android SDK
+      # ==========================================
+      - name: Configure Buildozer Android SDK
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          mkdir -p "$HOME/.buildozer"
+
+          cat > "$HOME/.buildozer/default.spec" <<EOF
+          [app]
+
+          # Application title
+          title = Dairy Farm
+
+          # Package name
+          package.name = dairyfarm
+
+          # Package domain
+          package.domain = org.dairyfarm
+
+          # Source directory
+          source.dir = .
+
+          # Source files
+          source.include_exts = py,db,toml
+
+          # Main Python file
+          entrypoint = main.py
+
+          # Android orientation
+          orientation = portrait
+
+          # Android architecture
+          android.archs = arm64-v8a
+
+          # Android API
+          android.api = 35
+
+          # Minimum Android API
+          android.minapi = 28
+
+          # Android SDK location
+          android.sdk_path = $ANDROID_HOME
+
+          # Android NDK
+          android.ndk = 27c
+
+          # Python requirements
+          requirements = python3,pyjnius
+
+          # Fullscreen
+          fullscreen = 0
+          EOF
+
+          echo "Buildozer configuration created."
+
+
+      # ==========================================
+      # 12. Configure environment for Buildozer
+      # ==========================================
+      - name: Configure Android environment
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+
+          export ANDROIDSDK="$ANDROID_HOME"
+          export ANDROID_SDK_ROOT="$ANDROID_HOME"
+
+          echo "ANDROIDSDK=$ANDROIDSDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+
+          mkdir -p "$HOME/.buildozer/android/platform"
+
+          ln -sfn \
+            "$ANDROID_HOME" \
+            "$HOME/.buildozer/android/platform/android-sdk"
+
+          echo ""
+          echo "Buildozer Android SDK:"
+          ls -ld \
+            "$HOME/.buildozer/android/platform/android-sdk"
+
+          echo ""
+          echo "Build Tools:"
+          ls -lah \
+            "$ANDROID_HOME/build-tools/35.0.0"
+
+          echo ""
+          echo "AIDL:"
+          ls -lh \
+            "$ANDROID_HOME/build-tools/35.0.0/aidl"
+
+
+      # ==========================================
+      # 13. Download PySide6 Android wheel
+      # ==========================================
       - name: Download PySide6 Android wheel
         shell: bash
         run: |
@@ -157,7 +306,10 @@ jobs:
 
           ls -lh pyside6-*.whl
 
-      # 11. Download Shiboken6 Android wheel
+
+      # ==========================================
+      # 14. Download Shiboken6 Android wheel
+      # ==========================================
       - name: Download Shiboken6 Android wheel
         shell: bash
         run: |
@@ -171,7 +323,34 @@ jobs:
 
           ls -lh shiboken6-*.whl
 
-      # 12. Clean build
+
+      # ==========================================
+      # 15. Verify deployment tool
+      # ==========================================
+      - name: Verify PySide Android deployment
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          echo "pyside6-android-deploy:"
+          which pyside6-android-deploy
+
+          echo ""
+          echo "pkginfo:"
+          python -c "import pkginfo; print('pkginfo OK')"
+
+          echo ""
+          echo "PySide6:"
+          python -c "import PySide6; print(PySide6.__version__)"
+
+          echo ""
+          echo "Deployment help:"
+          pyside6-android-deploy --help
+
+
+      # ==========================================
+      # 16. Clean previous build
+      # ==========================================
       - name: Clean previous build
         shell: bash
         run: |
@@ -183,9 +362,43 @@ jobs:
 
           mkdir -p artifacts
 
-          echo "Clean build directory ready"
+          echo "Clean build directory ready."
 
-      # 13. Build APK
+
+      # ==========================================
+      # 17. Re-create Buildozer SDK link
+      # ==========================================
+      - name: Restore Buildozer Android SDK link
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          mkdir -p "$HOME/.buildozer/android/platform"
+
+          ln -sfn \
+            "$ANDROID_HOME" \
+            "$HOME/.buildozer/android/platform/android-sdk"
+
+          echo "SDK link:"
+          ls -ld \
+            "$HOME/.buildozer/android/platform/android-sdk"
+
+          echo ""
+          echo "Build Tools:"
+          ls -lah \
+            "$ANDROID_HOME/build-tools/35.0.0"
+
+          echo ""
+          echo "AIDL:"
+          test -x \
+            "$ANDROID_HOME/build-tools/35.0.0/aidl"
+
+          echo "AIDL is available."
+
+
+      # ==========================================
+      # 18. Build APK
+      # ==========================================
       - name: Build Dairy Farm APK
         shell: bash
         run: |
@@ -208,19 +421,23 @@ jobs:
           java -version
 
           echo ""
+          echo "ANDROID_HOME:"
+          echo "$ANDROID_HOME"
+
+          echo ""
           echo "Project:"
           ls -lah
 
           echo ""
-          echo "PySide6 wheel:"
+          echo "PySide wheel:"
           ls -lh "$PYSIDE_WHEEL"
 
           echo ""
-          echo "Shiboken6 wheel:"
+          echo "Shiboken wheel:"
           ls -lh "$SHIBOKEN_WHEEL"
 
           echo ""
-          echo "Running deployment..."
+          echo "Starting deployment..."
 
           pyside6-android-deploy \
             --name "Dairy Farm" \
@@ -233,7 +450,10 @@ jobs:
           echo "ANDROID DEPLOYMENT FINISHED"
           echo "=========================================="
 
-      # 14. Find APK
+
+      # ==========================================
+      # 19. Search APK
+      # ==========================================
       - name: Find APK
         if: always()
         shell: bash
@@ -258,7 +478,10 @@ jobs:
             -name "*.aab" \
             -print 2>/dev/null || true
 
-      # 15. Prepare final APK
+
+      # ==========================================
+      # 20. Prepare final APK
+      # ==========================================
       - name: Prepare final APK
         if: success()
         shell: bash
@@ -274,10 +497,12 @@ jobs:
             -print -quit)
 
           if [ -z "$APK_FILE" ]; then
+
             echo "ERROR: APK was not generated."
 
             echo ""
-            echo "Searching again:"
+            echo "Searching all APK files:"
+
             find "$GITHUB_WORKSPACE" \
               -type f \
               -name "*.apk" \
@@ -286,6 +511,7 @@ jobs:
             exit 1
           fi
 
+          echo ""
           echo "APK FOUND:"
           echo "$APK_FILE"
 
@@ -297,7 +523,10 @@ jobs:
           ls -lh \
             "$GITHUB_WORKSPACE/artifacts/Dairy-Farm.apk"
 
-      # 16. Upload APK
+
+      # ==========================================
+      # 21. Upload APK
+      # ==========================================
       - name: Upload Dairy Farm APK
         if: success()
         uses: actions/upload-artifact@v4
@@ -306,7 +535,10 @@ jobs:
           path: artifacts/Dairy-Farm.apk
           if-no-files-found: error
 
-      # 17. Final result
+
+      # ==========================================
+      # 22. Final result
+      # ==========================================
       - name: Final result
         if: always()
         shell: bash
@@ -317,16 +549,20 @@ jobs:
           echo "=========================================="
 
           if [ -f "$GITHUB_WORKSPACE/artifacts/Dairy-Farm.apk" ]; then
+
             echo ""
             echo "SUCCESS!"
             echo ""
             echo "Dairy-Farm.apk was created."
-            echo ""
+
             ls -lh \
               "$GITHUB_WORKSPACE/artifacts/Dairy-Farm.apk"
+
           else
+
             echo ""
             echo "FAILED"
             echo ""
             echo "Dairy-Farm.apk was NOT created."
+
           fi
