@@ -53,7 +53,7 @@ jobs:
       - name: Download Android Shiboken6 wheel
         run: |
           wget -O shiboken6_android.whl \
-            https://download.qt.io/official_releases/QtForPython/pyside6/shiboken6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl
+            https://download.qt.io/official_releases/QtForPython/shiboken6/shiboken6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl
 
       - name: Check deployment tool
         run: |
