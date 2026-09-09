@@ -9,16 +9,12 @@ jobs:
 
     steps:
 
-      # ============================================================
       # 1. Checkout
-      # ============================================================
       - name: Checkout project
         uses: actions/checkout@v4
 
 
-      # ============================================================
       # 2. Java 17
-      # ============================================================
       - name: Set up Java 17
         uses: actions/setup-java@v5
         with:
@@ -26,283 +22,207 @@ jobs:
           java-version: "17"
 
 
-      # ============================================================
       # 3. Python 3.11
-      # ============================================================
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
 
-      # ============================================================
-      # 4. Install Linux dependencies
-      # ============================================================
+      # 4. Linux packages
       - name: Install Linux dependencies
         shell: bash
         run: |
-          set -e
+          set -euxo pipefail
 
           sudo apt-get update
 
           sudo apt-get install -y \
             git \
             wget \
+            curl \
             unzip \
             zip \
             build-essential \
             cmake \
             ninja-build \
-            pkg-config
+            pkg-config \
+            libffi-dev \
+            libssl-dev
 
-          echo "Linux dependencies installed."
+          echo "Linux dependencies OK"
 
 
-      # ============================================================
       # 5. Check project
-      # ============================================================
       - name: Check project
         shell: bash
         run: |
-          set -e
+          set -euxo pipefail
 
-          echo "======================================"
-          echo "DAIRY FARM PROJECT"
-          echo "======================================"
+          echo "=============================="
+          echo "PROJECT FILES"
+          echo "=============================="
 
-          echo ""
-          echo "Project files:"
           find . -maxdepth 2 -type f | sort
 
           echo ""
 
           if [ ! -f "main.py" ]; then
-            echo "ERROR: main.py was not found."
-            echo ""
-            echo "Your project must contain main.py"
+            echo "ERROR: main.py not found"
             exit 1
           fi
 
-          echo "main.py found."
+          echo "main.py FOUND"
+
+          if [ -f "dairy_farm.db" ]; then
+            echo "dairy_farm.db FOUND"
+          fi
+
+          if [ -f "dairy_app.py" ]; then
+            echo "dairy_app.py FOUND"
+          fi
 
 
-      # ============================================================
       # 6. Install PySide6
-      # ============================================================
       - name: Install PySide6
         shell: bash
         run: |
-          set -e
+          set -euxo pipefail
 
           python -m pip install --upgrade pip setuptools wheel
 
           python -m pip install \
             "PySide6==6.11.2"
 
-          echo ""
-          echo "PySide6 installed."
-
-          python -c "import PySide6; print('PySide6 version:', PySide6.__version__)"
+          python -c "import PySide6; print('PySide6:', PySide6.__version__)"
 
 
-      # ============================================================
-      # 7. Install Android deployment requirements
-      # ============================================================
+      # 7. Install ALL Android requirements
       - name: Install Android deployment requirements
         shell: bash
         run: |
-          set -e
+          set -euxo pipefail
 
-          echo "======================================"
-          echo "ANDROID DEPLOYMENT REQUIREMENTS"
-          echo "======================================"
-
-          REQUIREMENTS_FILE="$(
-            python -c '
+          REQUIREMENTS_FILE=$(python -c '
           import PySide6
           import os
+          print(os.path.join(
+              os.path.dirname(PySide6.__file__),
+              "scripts",
+              "requirements-android.txt"
+          ))
+          ')
 
-          print(
-              os.path.join(
-                  os.path.dirname(PySide6.__file__),
-                  "scripts",
-                  "requirements-android.txt"
-              )
-          )
-          '
-          )"
-
-          echo ""
-          echo "Requirements file:"
+          echo "Requirements:"
           echo "$REQUIREMENTS_FILE"
 
-          if [ ! -f "$REQUIREMENTS_FILE" ]; then
-            echo "ERROR: requirements-android.txt not found."
-            exit 1
-          fi
+          test -f "$REQUIREMENTS_FILE"
 
-          echo ""
-          echo "Installing official PySide6 Android requirements..."
-
-          python -m pip install \
-            --upgrade \
+          python -m pip install --upgrade \
             -r "$REQUIREMENTS_FILE"
 
+          # Explicitly install the package that previously caused the error
+          python -m pip install --upgrade pkginfo
+
           echo ""
-          echo "Android requirements installed."
+          echo "Android requirements installed"
 
 
-      # ============================================================
-      # 8. Verify pkginfo
-      # ============================================================
-      - name: Verify deployment packages
+      # 8. Verify packages
+      - name: Verify Python deployment packages
         shell: bash
         run: |
-          set -e
-
-          echo "======================================"
-          echo "VERIFYING PACKAGES"
-          echo "======================================"
+          set -euxo pipefail
 
           python -c "import pkginfo; print('pkginfo OK')"
           python -c "import packaging; print('packaging OK')"
+          python -c "import jinja2; print('jinja2 OK')"
+          python -c "import PySide6; print('PySide6 OK')"
 
           echo ""
-          echo "Python:"
-          python --version
-
-          echo ""
-          echo "pip:"
-          python -m pip --version
+          python -m pip show pkginfo
+          python -m pip show PySide6
 
 
-      # ============================================================
-      # 9. Download Android PySide6 wheel
-      # ============================================================
+      # 9. Android SDK
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+
+      # 10. Download PySide6 Android wheel
       - name: Download PySide6 Android wheel
         shell: bash
         run: |
-          set -e
-
-          echo "Downloading PySide6 Android wheel..."
+          set -euxo pipefail
 
           wget -q --show-progress \
             "https://download.qt.io/official_releases/QtForPython/pyside6/pyside6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl"
 
-          echo ""
-          echo "PySide6 wheel downloaded."
+          test -f pyside6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl
 
           ls -lh pyside6-*.whl
 
 
-      # ============================================================
-      # 10. Download Shiboken6 Android wheel
-      # ============================================================
+      # 11. Download Shiboken6 Android wheel
       - name: Download Shiboken6 Android wheel
         shell: bash
         run: |
-          set -e
-
-          echo "Downloading Shiboken6 Android wheel..."
+          set -euxo pipefail
 
           wget -q --show-progress \
             "https://download.qt.io/official_releases/QtForPython/shiboken6/shiboken6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl"
 
-          echo ""
-          echo "Shiboken6 wheel downloaded."
+          test -f shiboken6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl
 
           ls -lh shiboken6-*.whl
 
 
-      # ============================================================
-      # 11. Verify wheels
-      # ============================================================
-      - name: Verify Android wheels
+      # 12. Verify deploy command
+      - name: Verify PySide Android deploy
         shell: bash
         run: |
-          set -e
+          set -euxo pipefail
 
-          PYSIDE_WHEEL="$GITHUB_WORKSPACE/pyside6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl"
-          SHIBOKEN_WHEEL="$GITHUB_WORKSPACE/shiboken6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl"
-
-          echo "Checking PySide6 wheel..."
-
-          test -f "$PYSIDE_WHEEL"
-
-          echo "Checking Shiboken6 wheel..."
-
-          test -f "$SHIBOKEN_WHEEL"
-
-          echo ""
-          echo "Both Android wheels are available."
-
-          ls -lh "$PYSIDE_WHEEL"
-          ls -lh "$SHIBOKEN_WHEEL"
-
-
-      # ============================================================
-      # 12. Check Android deploy command
-      # ============================================================
-      - name: Check Android deploy
-        shell: bash
-        run: |
-          set -e
-
-          echo "======================================"
+          echo "=============================="
           echo "PYSIDE6 ANDROID DEPLOY"
-          echo "======================================"
+          echo "=============================="
 
-          command -v pyside6-android-deploy
+          which pyside6-android-deploy
 
-          echo ""
-          echo "Deploy tool:"
+          python -m pip show pkginfo
+
           pyside6-android-deploy --help
 
 
-      # ============================================================
-      # 13. Clean old build
-      # ============================================================
-      - name: Clean old build
+      # 13. Clean
+      - name: Clean previous build
         shell: bash
         run: |
-          set -e
+          set -euxo pipefail
 
-          rm -rf artifacts
-          rm -rf .buildozer
           rm -rf deployment
+          rm -rf .buildozer
+          rm -rf artifacts
 
           mkdir -p artifacts
 
-          echo "Old build files removed."
+          echo "Clean build directory ready"
 
 
-      # ============================================================
-      # 14. Build APK
-      # ============================================================
+      # 14. BUILD APK
       - name: Build Dairy Farm APK
         shell: bash
         run: |
-          set -e
+          set -euxo pipefail
 
           PYSIDE_WHEEL="$GITHUB_WORKSPACE/pyside6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl"
 
           SHIBOKEN_WHEEL="$GITHUB_WORKSPACE/shiboken6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl"
 
-          echo "======================================"
-          echo "BUILDING DAIRY FARM APK"
-          echo "======================================"
-
           echo ""
-          echo "Main Python file:"
-          ls -lh main.py
-
-          echo ""
-          echo "PySide6 wheel:"
-          ls -lh "$PYSIDE_WHEEL"
-
-          echo ""
-          echo "Shiboken6 wheel:"
-          ls -lh "$SHIBOKEN_WHEEL"
+          echo "=========================================="
+          echo "STARTING ANDROID DEPLOYMENT"
+          echo "=========================================="
 
           echo ""
           echo "Python:"
@@ -313,9 +233,19 @@ jobs:
           java -version
 
           echo ""
-          echo "======================================"
-          echo "STARTING ANDROID DEPLOYMENT"
-          echo "======================================"
+          echo "Main:"
+          ls -lh main.py
+
+          echo ""
+          echo "PySide wheel:"
+          ls -lh "$PYSIDE_WHEEL"
+
+          echo ""
+          echo "Shiboken wheel:"
+          ls -lh "$SHIBOKEN_WHEEL"
+
+          echo ""
+          echo "Running pyside6-android-deploy..."
 
           pyside6-android-deploy \
             --name "Dairy Farm" \
@@ -324,24 +254,22 @@ jobs:
             --force
 
           echo ""
-          echo "======================================"
+          echo "=========================================="
           echo "ANDROID DEPLOYMENT FINISHED"
-          echo "======================================"
+          echo "=========================================="
 
 
-      # ============================================================
-      # 15. Search for APK
-      # ============================================================
-      - name: Search for APK
+      # 15. Find APK
+      - name: Find APK
         if: always()
         shell: bash
         run: |
-          echo "======================================"
+          echo "=========================================="
           echo "SEARCHING FOR APK"
-          echo "======================================"
+          echo "=========================================="
 
           echo ""
-          echo "APK files found:"
+          echo "APK files:"
 
           find "$GITHUB_WORKSPACE" \
             -type f \
@@ -349,7 +277,7 @@ jobs:
             -print 2>/dev/null || true
 
           echo ""
-          echo "AAB files found:"
+          echo "AAB files:"
 
           find "$GITHUB_WORKSPACE" \
             -type f \
@@ -357,14 +285,12 @@ jobs:
             -print 2>/dev/null || true
 
 
-      # ============================================================
-      # 16. Prepare final APK
-      # ============================================================
+      # 16. Prepare APK
       - name: Prepare final APK
         if: success()
         shell: bash
         run: |
-          set -e
+          set -euxo pipefail
 
           APK_FILE=$(find "$GITHUB_WORKSPACE" \
             -type f \
@@ -373,43 +299,22 @@ jobs:
             -print -quit)
 
           if [ -z "$APK_FILE" ]; then
-
-            echo ""
-            echo "======================================"
-            echo "ERROR: APK WAS NOT GENERATED"
-            echo "======================================"
-
-            echo ""
-            echo "All APK/AAB files:"
-
-            find "$GITHUB_WORKSPACE" \
-              -type f \
-              \( -name "*.apk" -o -name "*.aab" \) \
-              -print || true
-
+            echo "ERROR: APK not found"
             exit 1
           fi
 
-          echo ""
-          echo "======================================"
-          echo "APK FOUND"
-          echo "======================================"
-
+          echo "APK FOUND:"
           echo "$APK_FILE"
 
           cp "$APK_FILE" \
             "$GITHUB_WORKSPACE/artifacts/Dairy-Farm.apk"
 
           echo ""
-          echo "Final APK created:"
-
-          ls -lh \
-            "$GITHUB_WORKSPACE/artifacts/Dairy-Farm.apk"
+          echo "FINAL APK:"
+          ls -lh "$GITHUB_WORKSPACE/artifacts/Dairy-Farm.apk"
 
 
-      # ============================================================
       # 17. Upload APK
-      # ============================================================
       - name: Upload Dairy Farm APK
         if: success()
         uses: actions/upload-artifact@v4
@@ -419,35 +324,23 @@ jobs:
           if-no-files-found: error
 
 
-      # ============================================================
-      # 18. Final result
-      # ============================================================
+      # 18. Final status
       - name: Final result
         if: always()
         shell: bash
         run: |
           echo ""
-          echo "======================================"
-          echo "DAIRY FARM APK BUILD RESULT"
-          echo "======================================"
+          echo "=========================================="
+          echo "DAIRY FARM BUILD RESULT"
+          echo "=========================================="
 
           if [ -f "$GITHUB_WORKSPACE/artifacts/Dairy-Farm.apk" ]; then
-
             echo ""
-            echo "BUILD STATUS: SUCCESS"
-            echo ""
-            echo "APK:"
+            echo "SUCCESS"
+            echo "Dairy-Farm.apk was created."
             ls -lh "$GITHUB_WORKSPACE/artifacts/Dairy-Farm.apk"
-
-            echo ""
-            echo "Your install-ready APK is:"
-            echo "Dairy-Farm.apk"
-
           else
-
             echo ""
-            echo "BUILD STATUS: FAILED"
-            echo ""
-            echo "APK was not created."
-
+            echo "FAILED"
+            echo "Dairy-Farm.apk was NOT created."
           fi
