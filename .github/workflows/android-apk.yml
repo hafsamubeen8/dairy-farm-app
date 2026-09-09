@@ -74,7 +74,6 @@ jobs:
 
           pyside6-android-deploy \
             --name "Dairy Farm" \
-            --input main.py \
             --wheel-pyside "$PYSIDE_WHEEL" \
             --wheel-shiboken "$SHIBOKEN_WHEEL" \
             --ndk-path "$ANDROID_NDK_ROOT" \
