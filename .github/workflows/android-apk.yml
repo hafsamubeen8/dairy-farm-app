@@ -1,4 +1,3 @@
-```yaml
 name: Build Dairy Farm APK
 
 "on":
@@ -44,16 +43,13 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
 
-      # 6. Install Android SDK + NDK 28
+      # 6. Install Android SDK and NDK 28
       - name: Install Android SDK and NDK
         shell: bash
         run: |
           echo "Finding modern sdkmanager..."
 
-          MODERN_SDKMANAGER=$(find "$ANDROID_SDK_ROOT/cmdline-tools" \
-            -type f \
-            -name sdkmanager \
-            2>/dev/null | head -n 1)
+          MODERN_SDKMANAGER=$(find "$ANDROID_SDK_ROOT/cmdline-tools" -type f -name sdkmanager 2>/dev/null | head -n 1)
 
           if [ -z "$MODERN_SDKMANAGER" ]; then
             echo "ERROR: Modern sdkmanager not found."
@@ -99,16 +95,13 @@ jobs:
 
           "$NDK_PATH/ndk-build" --version || true
 
-      # 7. Fix old sdkmanager used by Buildozer
+      # 7. Fix old Android sdkmanager
       - name: Fix old Android sdkmanager
         shell: bash
         run: |
           echo "Fixing old Android sdkmanager..."
 
-          MODERN_SDKMANAGER=$(find "$ANDROID_SDK_ROOT/cmdline-tools" \
-            -type f \
-            -name sdkmanager \
-            2>/dev/null | head -n 1)
+          MODERN_SDKMANAGER=$(find "$ANDROID_SDK_ROOT/cmdline-tools" -type f -name sdkmanager 2>/dev/null | head -n 1)
 
           if [ -z "$MODERN_SDKMANAGER" ]; then
             echo "ERROR: Modern sdkmanager not found."
@@ -120,10 +113,10 @@ jobs:
 
           mkdir -p "$ANDROID_SDK_ROOT/tools/bin"
 
-          cat > "$ANDROID_SDK_ROOT/tools/bin/sdkmanager" <<EOF
-#!/bin/bash
-exec "$MODERN_SDKMANAGER" "\$@"
-EOF
+          printf '%s\n' \
+            '#!/bin/bash' \
+            'exec "'"$MODERN_SDKMANAGER"'" "$@"' \
+            > "$ANDROID_SDK_ROOT/tools/bin/sdkmanager"
 
           chmod +x "$ANDROID_SDK_ROOT/tools/bin/sdkmanager"
 
@@ -133,7 +126,7 @@ EOF
 
           echo "sdkmanager fixed successfully."
 
-      # 8. Make sure old sdkmanager is first in PATH
+      # 8. Update Android PATH
       - name: Update Android PATH
         shell: bash
         run: |
@@ -175,7 +168,7 @@ EOF
 
           echo "Shiboken6 Android wheel downloaded."
 
-      # 12. Check wheels
+      # 12. Check Android wheels
       - name: Check Android wheels
         run: |
           echo "Checking Android wheels..."
@@ -203,7 +196,7 @@ EOF
 
           echo "Old Android build removed."
 
-      # 15. Verify Java / SDK / NDK
+      # 15. Verify Android environment
       - name: Verify Android environment
         shell: bash
         run: |
@@ -319,4 +312,3 @@ EOF
             **/*.apk
             **/*.aab
           if-no-files-found: error
-```
