@@ -15,6 +15,7 @@ jobs:
       - name: Checkout project
         uses: actions/checkout@v4
 
+
       # ============================================================
       # 2. Java 17
       # ============================================================
@@ -24,6 +25,7 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+
       # ============================================================
       # 3. Python 3.11
       # ============================================================
@@ -32,296 +34,115 @@ jobs:
         with:
           python-version: "3.11"
 
+
       # ============================================================
       # 4. Check project
       # ============================================================
-      - name: Check project files
+      - name: Check project
         shell: bash
         run: |
           set -e
 
-          echo "================================="
+          echo "======================================"
           echo "DAIRY FARM PROJECT"
-          echo "================================="
+          echo "======================================"
 
           pwd
           echo ""
 
-          ls -la
+          find . -maxdepth 2 -type f | sort
 
           echo ""
 
           if [ ! -f "main.py" ]; then
             echo "ERROR: main.py not found."
+            echo ""
+            echo "Your project must contain main.py"
             exit 1
           fi
 
-          if [ -f "dairy_app.py" ]; then
-            echo "dairy_app.py found."
-          fi
+          echo "main.py found."
 
-          if [ -f "dairy_farm.db" ]; then
-            echo "dairy_farm.db found."
-          else
-            echo "WARNING: dairy_farm.db not found."
-          fi
-
-          echo ""
-          echo "Project check complete."
 
       # ============================================================
-      # 5. Android SDK
+      # 5. Install basic Linux dependencies
       # ============================================================
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v4
-
-      # ============================================================
-      # 6. Install Android SDK
-      # ============================================================
-      - name: Install Android SDK packages
+      - name: Install Linux dependencies
         shell: bash
         run: |
           set -e
 
-          echo "================================="
-          echo "ANDROID SDK"
-          echo "================================="
+          sudo apt-get update
 
-          MODERN_SDKMANAGER=$(find \
-            "$ANDROID_SDK_ROOT/cmdline-tools" \
-            -type f \
-            -name sdkmanager \
-            2>/dev/null | head -n 1)
+          sudo apt-get install -y \
+            git \
+            wget \
+            unzip \
+            zip \
+            build-essential \
+            cmake \
+            ninja-build \
+            pkg-config \
+            libgl1-mesa-dev \
+            libegl1-mesa-dev \
+            libxkbcommon-dev \
+            libdbus-1-dev
 
-          if [ -z "$MODERN_SDKMANAGER" ]; then
-            echo "ERROR: Modern sdkmanager not found."
-            exit 1
-          fi
+          echo "Linux dependencies installed."
 
-          echo "Modern sdkmanager:"
-          echo "$MODERN_SDKMANAGER"
-
-          echo ""
-          echo "sdkmanager version:"
-          "$MODERN_SDKMANAGER" --version
-
-          echo ""
-          echo "Accepting licenses..."
-
-          yes | "$MODERN_SDKMANAGER" --licenses >/dev/null 2>&1 || true
-
-          echo ""
-          echo "Installing Android packages..."
-
-          "$MODERN_SDKMANAGER" \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0" \
-            "ndk;27.2.12479018"
-
-          echo ""
-          echo "Android packages installed."
 
       # ============================================================
-      # 7. FIX THE OLD SDKMANAGER
-      #
-      # This is the IMPORTANT fix for:
-      #
-      # javax/xml/bind/annotation/XmlSchema
-      #
-      # Buildozer is explicitly calling:
-      #
-      # /android/sdk/tools/bin/sdkmanager
-      #
-      # so we replace that old executable with the modern one.
+      # 6. Install Python build dependencies
       # ============================================================
-      - name: Fix legacy Android sdkmanager
-        shell: bash
-        run: |
-          set -e
-
-          echo "================================="
-          echo "FIXING LEGACY SDKMANAGER"
-          echo "================================="
-
-          MODERN_SDKMANAGER=$(find \
-            "$ANDROID_SDK_ROOT/cmdline-tools" \
-            -type f \
-            -name sdkmanager \
-            2>/dev/null | head -n 1)
-
-          if [ -z "$MODERN_SDKMANAGER" ]; then
-            echo "ERROR: Modern sdkmanager not found."
-            exit 1
-          fi
-
-          echo "Modern sdkmanager:"
-          echo "$MODERN_SDKMANAGER"
-
-          LEGACY_DIR="$ANDROID_SDK_ROOT/tools/bin"
-          LEGACY_SDKMANAGER="$LEGACY_DIR/sdkmanager"
-
-          echo ""
-          echo "Legacy sdkmanager:"
-          echo "$LEGACY_SDKMANAGER"
-
-          mkdir -p "$LEGACY_DIR"
-
-          # Remove old Android SDK manager
-          rm -f "$LEGACY_SDKMANAGER"
-
-          # Create a wrapper which launches the modern sdkmanager
-          cat > "$LEGACY_SDKMANAGER" <<EOF
-          #!/bin/bash
-          exec "$MODERN_SDKMANAGER" "\$@"
-          EOF
-
-          chmod +x "$LEGACY_SDKMANAGER"
-
-          echo ""
-          echo "Testing legacy path..."
-
-          "$LEGACY_SDKMANAGER" --version
-
-          echo ""
-          echo "================================="
-          echo "SDKMANAGER FIXED"
-          echo "================================="
-
-      # ============================================================
-      # 8. Update PATH
-      # ============================================================
-      - name: Update Android PATH
-        shell: bash
-        run: |
-          echo "$ANDROID_SDK_ROOT/tools/bin" >> "$GITHUB_PATH"
-          echo "$ANDROID_SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
-          echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
-
-          echo "Android PATH updated."
-
-      # ============================================================
-      # 9. Set Android environment
-      # ============================================================
-      - name: Set Android environment
-        shell: bash
-        run: |
-          set -e
-
-          NDK_PATH="$ANDROID_SDK_ROOT/ndk/27.2.12479018"
-
-          if [ ! -d "$NDK_PATH" ]; then
-            echo "ERROR: NDK not found:"
-            echo "$NDK_PATH"
-            exit 1
-          fi
-
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
-          echo "ANDROIDSDK=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
-
-          echo "ANDROID_NDK_ROOT=$NDK_PATH" >> "$GITHUB_ENV"
-          echo "ANDROID_NDK_HOME=$NDK_PATH" >> "$GITHUB_ENV"
-          echo "ANDROID_NDK=$NDK_PATH" >> "$GITHUB_ENV"
-          echo "ANDROIDNDK=$NDK_PATH" >> "$GITHUB_ENV"
-          echo "NDK_PATH=$NDK_PATH" >> "$GITHUB_ENV"
-
-          echo ""
-          echo "Android SDK:"
-          echo "$ANDROID_SDK_ROOT"
-
-          echo ""
-          echo "Android NDK:"
-          echo "$NDK_PATH"
-
-      # ============================================================
-      # 10. Verify sdkmanager
-      # ============================================================
-      - name: Verify sdkmanager
-        shell: bash
-        run: |
-          set -e
-
-          echo "================================="
-          echo "VERIFY SDKMANAGER"
-          echo "================================="
-
-          echo ""
-          echo "PATH sdkmanager:"
-          which sdkmanager || true
-
-          echo ""
-          echo "Legacy sdkmanager:"
-          "$ANDROID_SDK_ROOT/tools/bin/sdkmanager" --version
-
-          echo ""
-          echo "Modern sdkmanager:"
-          MODERN_SDKMANAGER=$(find \
-            "$ANDROID_SDK_ROOT/cmdline-tools" \
-            -type f \
-            -name sdkmanager \
-            2>/dev/null | head -n 1)
-
-          "$MODERN_SDKMANAGER" --version
-
-          echo ""
-          echo "SDK manager verification successful."
-
-      # ============================================================
-      # 11. Install Python packages
-      # ============================================================
-      - name: Install Python packages
+      - name: Install Python dependencies
         shell: bash
         run: |
           set -e
 
           python -m pip install --upgrade pip setuptools wheel
 
-          pip install \
+          python -m pip install \
             PySide6==6.11.2 \
-            pkginfo \
+            shiboken6==6.11.2 \
             packaging \
             jinja2 \
-            tqdm \
-            buildozer
+            tqdm
 
           echo ""
-          echo "Python packages installed."
-
+          echo "Python:"
           python --version
-          pip --version
+
+          echo ""
+          echo "PySide6:"
+          python -c "import PySide6; print(PySide6.__version__)"
+
 
       # ============================================================
-      # 12. Download PySide6 Android wheel
+      # 7. Download Android PySide6 wheels
       # ============================================================
-      - name: Download PySide6 Android wheel
+      - name: Download Android wheels
         shell: bash
         run: |
           set -e
+
+          echo "Downloading PySide6 Android wheel..."
 
           wget -q --show-progress \
             "https://download.qt.io/official_releases/QtForPython/pyside6/pyside6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl"
 
           echo ""
-          echo "PySide6 Android wheel:"
-          ls -lh pyside6-*.whl
-
-      # ============================================================
-      # 13. Download Shiboken6 Android wheel
-      # ============================================================
-      - name: Download Shiboken6 Android wheel
-        shell: bash
-        run: |
-          set -e
+          echo "Downloading Shiboken6 Android wheel..."
 
           wget -q --show-progress \
             "https://download.qt.io/official_releases/QtForPython/shiboken6/shiboken6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl"
 
           echo ""
-          echo "Shiboken6 Android wheel:"
-          ls -lh shiboken6-*.whl
+          echo "Downloaded wheels:"
+          ls -lh *.whl
+
 
       # ============================================================
-      # 14. Verify wheels
+      # 8. Verify Android wheels
       # ============================================================
       - name: Verify Android wheels
         shell: bash
@@ -329,82 +150,48 @@ jobs:
           set -e
 
           PYSIDE_WHEEL="$GITHUB_WORKSPACE/pyside6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl"
-
           SHIBOKEN_WHEEL="$GITHUB_WORKSPACE/shiboken6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl"
 
           test -f "$PYSIDE_WHEEL"
           test -f "$SHIBOKEN_WHEEL"
 
-          echo "PySide6 wheel OK."
-          echo "Shiboken6 wheel OK."
+          echo "PySide6 Android wheel OK."
+          echo "Shiboken6 Android wheel OK."
+
 
       # ============================================================
-      # 15. Check PySide deployment
+      # 9. Check deployment tool
       # ============================================================
       - name: Check PySide Android deploy
         shell: bash
         run: |
           set -e
 
-          which pyside6-android-deploy
+          echo "======================================"
+          echo "PYSIDE6 ANDROID DEPLOY"
+          echo "======================================"
+
+          command -v pyside6-android-deploy
 
           pyside6-android-deploy --help
 
-      # ============================================================
-      # 16. Clean previous deployment
-      # ============================================================
-      - name: Clean previous deployment
-        shell: bash
-        run: |
-          rm -rf .buildozer
-          rm -rf deployment
-          rm -rf artifacts
-
-          mkdir -p artifacts
-
-          echo "Previous deployment cleaned."
 
       # ============================================================
-      # 17. Verify Android environment
+      # 10. Create output directory
       # ============================================================
-      - name: Verify Android environment
+      - name: Prepare output
         shell: bash
         run: |
           set -e
 
-          echo "================================="
-          echo "ANDROID ENVIRONMENT"
-          echo "================================="
+          rm -rf artifacts
+          mkdir -p artifacts
 
-          echo ""
-          echo "Java:"
-          java -version
+          echo "Output directory ready."
 
-          echo ""
-          echo "Python:"
-          python --version
-
-          echo ""
-          echo "SDK:"
-          echo "$ANDROID_SDK_ROOT"
-
-          echo ""
-          echo "NDK:"
-          echo "$ANDROID_NDK_ROOT"
-
-          echo ""
-          echo "sdkmanager:"
-          "$ANDROID_SDK_ROOT/tools/bin/sdkmanager" --version
-
-          echo ""
-          echo "ADB:"
-          adb version
-
-          echo ""
-          echo "Environment OK."
 
       # ============================================================
-      # 18. Build Android APK
+      # 11. Build APK
       # ============================================================
       - name: Build Dairy Farm APK
         shell: bash
@@ -412,66 +199,49 @@ jobs:
           set -e
 
           PYSIDE_WHEEL="$GITHUB_WORKSPACE/pyside6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl"
-
           SHIBOKEN_WHEEL="$GITHUB_WORKSPACE/shiboken6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl"
 
-          echo "================================="
+          echo "======================================"
           echo "BUILDING DAIRY FARM APK"
-          echo "================================="
+          echo "======================================"
 
           echo ""
-          echo "Main:"
-          echo "$GITHUB_WORKSPACE/main.py"
+          echo "Main file:"
+          ls -lh main.py
 
           echo ""
-          echo "PySide6:"
-          echo "$PYSIDE_WHEEL"
+          echo "PySide6 wheel:"
+          ls -lh "$PYSIDE_WHEEL"
 
           echo ""
-          echo "Shiboken6:"
-          echo "$SHIBOKEN_WHEEL"
+          echo "Shiboken6 wheel:"
+          ls -lh "$SHIBOKEN_WHEEL"
 
           echo ""
-          echo "SDK:"
-          echo "$ANDROID_SDK_ROOT"
-
-          echo ""
-          echo "NDK:"
-          echo "$ANDROID_NDK_ROOT"
-
-          echo ""
-          echo "sdkmanager test:"
-          "$ANDROID_SDK_ROOT/tools/bin/sdkmanager" --version
-
-          echo ""
-          echo "================================="
-          echo "RUNNING PYSIDE6-ANDROID-DEPLOY"
-          echo "================================="
+          echo "Running pyside6-android-deploy..."
 
           pyside6-android-deploy \
             --name "Dairy Farm" \
             --wheel-pyside "$PYSIDE_WHEEL" \
             --wheel-shiboken "$SHIBOKEN_WHEEL" \
-            --ndk-path "$ANDROID_NDK_ROOT" \
-            --sdk-path "$ANDROID_SDK_ROOT" \
-            --keep-deployment-files \
             --force
 
           echo ""
-          echo "================================="
-          echo "PYSIDE6 DEPLOY FINISHED"
-          echo "================================="
+          echo "======================================"
+          echo "PYSIDE6 DEPLOYMENT FINISHED"
+          echo "======================================"
+
 
       # ============================================================
-      # 19. Find APK
+      # 12. Find APK
       # ============================================================
-      - name: Find generated APK
+      - name: Find APK
         if: always()
         shell: bash
         run: |
-          echo "================================="
+          echo "======================================"
           echo "SEARCHING FOR APK"
-          echo "================================="
+          echo "======================================"
 
           echo ""
           echo "APK files:"
@@ -489,8 +259,9 @@ jobs:
             -name "*.aab" \
             -print 2>/dev/null || true
 
+
       # ============================================================
-      # 20. Prepare APK
+      # 13. Prepare APK
       # ============================================================
       - name: Prepare APK
         if: success()
@@ -505,17 +276,31 @@ jobs:
             -print -quit)
 
           if [ -z "$APK_FILE" ]; then
+            echo ""
             echo "ERROR: APK was not generated."
             echo ""
-            echo "Complete APK/AAB search:"
+            echo "Full APK/AAB search:"
+
             find "$GITHUB_WORKSPACE" \
               -type f \
               \( -name "*.apk" -o -name "*.aab" \) \
               -print || true
+
+            echo ""
+            echo "Deployment folders:"
+            find "$GITHUB_WORKSPACE" \
+              -maxdepth 4 \
+              -type d \
+              \( -name "*build*" -o -name "*deploy*" -o -name "*android*" \) \
+              -print || true
+
             exit 1
           fi
 
-          echo "APK found:"
+          echo "======================================"
+          echo "APK FOUND"
+          echo "======================================"
+
           echo "$APK_FILE"
 
           cp "$APK_FILE" \
@@ -525,8 +310,9 @@ jobs:
           echo "Final APK:"
           ls -lh "$GITHUB_WORKSPACE/artifacts/Dairy-Farm.apk"
 
+
       # ============================================================
-      # 21. Upload APK
+      # 14. Upload APK
       # ============================================================
       - name: Upload Dairy Farm APK
         if: success()
@@ -536,23 +322,32 @@ jobs:
           path: artifacts/Dairy-Farm.apk
           if-no-files-found: error
 
+
       # ============================================================
-      # 22. Final summary
+      # 15. Summary
       # ============================================================
       - name: Build summary
         if: always()
         shell: bash
         run: |
-          echo "================================="
+          echo ""
+          echo "======================================"
           echo "DAIRY FARM APK BUILD SUMMARY"
-          echo "================================="
+          echo "======================================"
 
           if [ -f "$GITHUB_WORKSPACE/artifacts/Dairy-Farm.apk" ]; then
+
+            echo ""
             echo "BUILD STATUS: SUCCESS"
             echo ""
+            echo "APK:"
             ls -lh "$GITHUB_WORKSPACE/artifacts/Dairy-Farm.apk"
+
           else
+
+            echo ""
             echo "BUILD STATUS: FAILED"
             echo ""
             echo "APK was not created."
+
           fi
