@@ -32,6 +32,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install PySide6==6.11.2
 
+      - name: Install Android deploy requirements
+        run: |
+          pip install -r "$(python -c "import PySide6, pathlib; print(pathlib.Path(PySide6.__file__).parent / 'scripts' / 'requirements-android.txt')")"
+
+      - name: Check installation
+        run: |
+          python -c "import PySide6; print('PySide6:', PySide6.__version__)"
+          pip show jinja2
+          pip show pkginfo
+          pip show tqdm
+          pip show packaging
+
       - name: Download Android wheels
         run: |
           mkdir -p wheels
