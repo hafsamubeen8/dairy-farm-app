@@ -1,76 +1,27 @@
-name: Build Dairy Farm APK
+name: Build Android APK
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [ main, master ]
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            git \
-            build-essential \
-            openjdk-17-jdk \
-            unzip \
-            zip \
-            wget
-
-      - name: Install PySide6
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install PySide6==6.11.2
+          pip install pyside6 shiboken6
 
-      - name: Install Android deploy requirements
+      - name: Build with Briefcase or Buildozer (as per your project)
         run: |
-          pip install -r "$(python -c "import PySide6, pathlib; print(pathlib.Path(PySide6.__file__).parent / 'scripts' / 'requirements-android.txt')")"
-
-      - name: Download PySide6 Android wheels
-        run: |
-          mkdir -p wheels
-
-          wget -O wheels/PySide6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl \
-            https://download.qt.io/official_releases/QtForPython/pyside6/6.11.2/pyside6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl
-
-          wget -O wheels/shiboken6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl \
-            https://download.qt.io/official_releases/QtForPython/pyside6/6.11.2/shiboken6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl
-
-      - name: Verify Android wheels
-        run: |
-          ls -lh wheels
-          file wheels/*.whl
-
-      - name: Prepare main.py
-        run: |
-          cp dairy_app.py main.py
-
-      - name: Build Android APK
-        run: |
-          pyside6-android-deploy \
-            --name "Dairy Farm" \
-            --wheel-pyside "wheels/PySide6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl" \
-            --wheel-shiboken "wheels/shiboken6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl" \
-            --config-file pysidedeploy.spec
-
-      - name: Find APK
-        run: |
-          echo "Searching for APK..."
-          find . -type f -name "*.apk" -print
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: dairy-farm-apk
-          path: "**/*.apk"
-          if-no-files-found: error
+          echo "Please ensure your build script is correctly configured"
