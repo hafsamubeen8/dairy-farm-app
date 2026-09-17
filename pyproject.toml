@@ -1,11 +1,7 @@
 [project]
-name = "DairyFarm"
+name = "Dairy Farm"
 version = "1.0.0"
-description = "Dairy Farm Management App"
+description = "Dairy Farm Management System"
 
 [tool.pyside6-project]
-files = [
-    "main.py",
-    "dairy_app.py",
-    "dairy_farm.db"
-]
+files = ["dairy_app.py"]
