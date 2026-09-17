@@ -1,0 +1,63 @@
+name: Build Dairy Farm APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git \
+            build-essential \
+            openjdk-17-jdk \
+            unzip \
+            zip \
+            wget
+
+      - name: Install PySide6
+        run: |
+          python -m pip install --upgrade pip
+          pip install PySide6==6.11.2
+
+      - name: Download Android wheels
+        run: |
+          mkdir -p wheels
+          pip install qtpip
+          qtpip download PySide6 --android --arch aarch64 --output wheels
+
+      - name: Show wheels
+        run: |
+          ls -lh wheels
+
+      - name: Build APK
+        run: |
+          pyside6-android-deploy \
+            --name "Dairy Farm" \
+            --wheel-pyside="$(find wheels -name 'PySide6-*-android_aarch64.whl' | head -1)" \
+            --wheel-shiboken="$(find wheels -name 'shiboken6-*-android_aarch64.whl' | head -1)" \
+            --config-file pysidedeploy.spec \
+            --force
+
+      - name: Find APK
+        run: |
+          find . -type f -name "*.apk" -print
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: dairy-farm-apk
+          path: "**/*.apk"
+          if-no-files-found: error
