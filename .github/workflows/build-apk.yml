@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Python
@@ -36,35 +36,36 @@ jobs:
         run: |
           pip install -r "$(python -c "import PySide6, pathlib; print(pathlib.Path(PySide6.__file__).parent / 'scripts' / 'requirements-android.txt')")"
 
-      - name: Check installation
-        run: |
-          python -c "import PySide6; print('PySide6:', PySide6.__version__)"
-          pip show jinja2
-          pip show pkginfo
-          pip show tqdm
-          pip show packaging
-
-      - name: Download Android wheels
+      - name: Download PySide6 Android wheels
         run: |
           mkdir -p wheels
-          pip install qtpip
-          qtpip download PySide6 --android --arch aarch64 --output wheels
 
-      - name: Show wheels
+          wget -O wheels/PySide6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl \
+            https://download.qt.io/official_releases/QtForPython/pyside6/6.11.2/pyside6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl
+
+          wget -O wheels/shiboken6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl \
+            https://download.qt.io/official_releases/QtForPython/pyside6/6.11.2/shiboken6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl
+
+      - name: Verify Android wheels
         run: |
           ls -lh wheels
+          file wheels/*.whl
 
-      - name: Build APK
+      - name: Prepare main.py
+        run: |
+          cp dairy_app.py main.py
+
+      - name: Build Android APK
         run: |
           pyside6-android-deploy \
             --name "Dairy Farm" \
-            --wheel-pyside="$(find wheels -name 'PySide6-*-android_aarch64.whl' | head -1)" \
-            --wheel-shiboken="$(find wheels -name 'shiboken6-*-android_aarch64.whl' | head -1)" \
-            --config-file pysidedeploy.spec \
-            --force
+            --wheel-pyside "wheels/PySide6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl" \
+            --wheel-shiboken "wheels/shiboken6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl" \
+            --config-file pysidedeploy.spec
 
       - name: Find APK
         run: |
+          echo "Searching for APK..."
           find . -type f -name "*.apk" -print
 
       - name: Upload APK
